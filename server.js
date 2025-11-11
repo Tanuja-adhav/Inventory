@@ -1,14 +1,19 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const cors = require('cors');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const port = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: true, // allow all origins or set your frontend URL
+  credentials: true,
+}));
 app.use(express.json());
 
 // MongoDB setup
@@ -19,18 +24,16 @@ const client = new MongoClient(process.env.MONGO_URI, {
     deprecationErrors: true,
   },
   tls: true,
-  tlsAllowInvalidCertificates: true, // for Render only
+  tlsAllowInvalidCertificates: true,
 });
 
 let db;
-
-// Connect once and reuse
 async function connectDB() {
   if (!db) {
     try {
       await client.connect();
       console.log('✅ Connected to MongoDB Atlas!');
-      db = client.db('inventoryDB'); // default database
+      db = client.db('inventoryDB');
     } catch (err) {
       console.error('❌ MongoDB connection error:', err);
     }
@@ -38,7 +41,49 @@ async function connectDB() {
   return db;
 }
 
-// --- API ROUTES ---
+// -------------------- AUTH ROUTES --------------------
+
+// Register user
+app.post('/api/register', async (req, res) => {
+  try {
+    const database = await connectDB();
+    const { username, email, password } = req.body;
+
+    const existing = await database.collection('users').findOne({ email });
+    if (existing) return res.status(400).json({ error: 'User already exists' });
+
+    const hashed = await bcrypt.hash(password, 10);
+    const result = await database.collection('users').insertOne({
+      username, email, password: hashed
+    });
+
+    const token = jwt.sign({ id: result.insertedId }, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
+    res.json({ token, userId: result.insertedId });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Login user
+app.post('/api/login', async (req, res) => {
+  try {
+    const database = await connectDB();
+    const { email, password } = req.body;
+
+    const user = await database.collection('users').findOne({ email });
+    if (!user) return res.status(400).json({ error: 'User not found' });
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(400).json({ error: 'Invalid password' });
+
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
+    res.json({ token, userId: user._id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// -------------------- PRODUCT & WISHLIST ROUTES --------------------
 
 // Get all products
 app.get('/api/products', async (req, res) => {
@@ -84,17 +129,16 @@ app.post('/api/wishlist', async (req, res) => {
   }
 });
 
-// --- SERVE FRONTEND ---
+// -------------------- SERVE FRONTEND --------------------
 
-// Serve static files from Vite build (dist folder)
+// Serve Vite build folder (dist)
 app.use(express.static(path.join(__dirname, 'dist')));
 
-// Serve index.html for all other routes (React router)
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
-// --- START SERVER ---
+// -------------------- START SERVER --------------------
 app.listen(port, () => {
   console.log(`🚀 Backend + Frontend running on port ${port}`);
 });

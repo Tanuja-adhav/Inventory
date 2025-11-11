@@ -1,14 +1,16 @@
 require('dotenv').config();
 const { MongoClient, ServerApiVersion } = require('mongodb');
 
-const uri = process.env.MONGO_URI; // must match .env key exactly
-
-if (!uri) {
-  throw new Error("MONGO_URI is undefined! Check your .env file");
-}
+const uri = process.env.MONGO_URI;
 
 const client = new MongoClient(uri, {
-  serverApi: { version: ServerApiVersion.v1, strict: true, deprecationErrors: true }
+  serverApi: {
+    version: ServerApiVersion.v1,
+    strict: true,
+    deprecationErrors: true,
+  },
+  tls: true,
+  tlsAllowInvalidCertificates: true, // temporary for Render deployment
 });
 
 async function run() {
@@ -16,9 +18,11 @@ async function run() {
     await client.connect();
     await client.db("admin").command({ ping: 1 });
     console.log("✅ Connected to MongoDB Atlas!");
+  } catch (err) {
+    console.error("❌ MongoDB connection error:", err);
   } finally {
     await client.close();
   }
 }
 
-run().catch(console.dir);
+run();

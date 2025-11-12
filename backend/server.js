@@ -7,14 +7,11 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 const app = express();
 
-// Enable CORS
-app.use(cors({
-  origin: '*' // or replace with your frontend URL if deployed separately
-}));
-
+// --- Middleware ---
+app.use(cors({ origin: '*' })); // allow frontend requests from anywhere
 app.use(express.json());
 
-// MongoDB connection
+// --- MongoDB connection ---
 const uri = process.env.MONGO_URI;
 if (!uri) throw new Error("MONGO_URI is undefined! Check your .env file");
 
@@ -72,8 +69,10 @@ app.delete('/wishlist/remove/:id', async (req, res) => {
   }
 });
 
-// --- Serve frontend ---
-const frontendPath = path.join(__dirname, 'dist'); // frontend build inside backend
+// --- Serve React frontend ---
+// Path to the dist folder inside backend
+const frontendPath = path.join(__dirname, 'dist');
+
 app.use(express.static(frontendPath));
 
 app.get('*', (req, res) => {

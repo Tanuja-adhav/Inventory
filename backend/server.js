@@ -7,11 +7,11 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 const app = express();
 
-// --- Middleware ---
-app.use(cors({ origin: '*' })); // allow frontend requests from anywhere
+// Middleware
+app.use(cors());
 app.use(express.json());
 
-// --- MongoDB connection ---
+// MongoDB connection
 const uri = process.env.MONGO_URI;
 if (!uri) throw new Error("MONGO_URI is undefined! Check your .env file");
 
@@ -28,11 +28,10 @@ async function connectDB() {
     console.error("❌ MongoDB connection error:", err);
   }
 }
+
 connectDB();
 
 // --- API routes ---
-
-// Get all products
 app.get('/products', async (req, res) => {
   try {
     const db = client.db("inventory");
@@ -44,7 +43,6 @@ app.get('/products', async (req, res) => {
   }
 });
 
-// Get wishlist
 app.get('/wishlist', async (req, res) => {
   try {
     const db = client.db("inventory");
@@ -56,7 +54,6 @@ app.get('/wishlist', async (req, res) => {
   }
 });
 
-// Remove item from wishlist
 app.delete('/wishlist/remove/:id', async (req, res) => {
   try {
     const db = client.db("inventory");
@@ -69,10 +66,8 @@ app.delete('/wishlist/remove/:id', async (req, res) => {
   }
 });
 
-// --- Serve React frontend ---
-// Path to the dist folder inside backend
-const frontendPath = path.join(__dirname, 'dist');
-
+// --- Serve React frontend build from backend/dist ---
+const frontendPath = path.join(__dirname, 'dist'); // <-- dist is inside backend now
 app.use(express.static(frontendPath));
 
 app.get('*', (req, res) => {

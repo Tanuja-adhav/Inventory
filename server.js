@@ -2,19 +2,24 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const path = require('path');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 const app = express();
-app.use(cors());
+
+// CORS: allow frontend requests
+app.use(cors({
+  origin: '*' // Change to your frontend URL in production for security
+}));
+
 app.use(express.json());
 
-const uri = process.env.MONGO_URI; // From .env
-if (!uri) throw new Error("MONGO_URI is undefined! Check your .env file");
+// MongoDB connection
+const uri = process.env.MONGO_URI;
+if (!uri) throw new Error("MONGO_URI is undefined! Check your .env");
 
 const client = new MongoClient(uri, {
   serverApi: { version: ServerApiVersion.v1, strict: true, deprecationErrors: true },
-  tls: true,
-  tlsAllowInvalidCertificates: false,
 });
 
 async function connectDB() {
@@ -26,13 +31,12 @@ async function connectDB() {
     console.error("❌ MongoDB connection error:", err);
   }
 }
-
 connectDB();
 
-// Example route
+// --- API routes ---
 app.get('/products', async (req, res) => {
   try {
-    const db = client.db("inventory"); // Replace with your DB name
+    const db = client.db("inventory");
     const products = await db.collection("products").find().toArray();
     res.json(products);
   } catch (err) {
@@ -41,5 +45,37 @@ app.get('/products', async (req, res) => {
   }
 });
 
+app.get('/wishlist', async (req, res) => {
+  try {
+    const db = client.db("inventory");
+    const wishlist = await db.collection("wishlist").find().toArray();
+    res.json(wishlist);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.delete('/wishlist/remove/:id', async (req, res) => {
+  try {
+    const db = client.db("inventory");
+    const id = req.params.id;
+    await db.collection("wishlist").deleteOne({ _id: new ObjectId(id) });
+    res.json({ message: 'Item removed from wishlist' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// --- Serve React frontend ---
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, '../frontend/dist'))); // Vite build folder
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../frontend/dist', 'index.html'));
+  });
+}
+
+// --- Start server ---
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Backend running on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Backend & Frontend running on port ${PORT}`));
